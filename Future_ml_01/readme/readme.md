@@ -154,5 +154,5 @@ Add user input filters
 
 **Srikar Reddy**
 
-Data Science | Visualization | Forecasting
+Machine Learning | Visualization | Forecasting
 
