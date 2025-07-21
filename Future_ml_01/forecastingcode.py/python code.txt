@@ -1,0 +1,130 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+from prophet import Prophet
+
+# === Global Constants ===
+DATA_PATH = Path("Data/superstore_sales.csv")
+IMAGE_DIR = Path("Images")
+IMAGE_DIR.mkdir(exist_ok=True)
+
+# === Function to Load Data ===
+def load_data(filepath):
+    try:
+        df = pd.read_csv(filepath, encoding='ISO-8859-1')
+        df['Order Date'] = pd.to_datetime(df['Order Date'])
+        print("✅ Data loaded and date converted successfully.")
+        return df
+    except Exception as e:
+        print(f"❌ Error loading data: {e}")
+        return None
+
+# === Function to Compute Monthly Sales ===
+def compute_monthly_sales(df):
+    return df.resample('M', on='Order Date')['Sales'].sum()
+
+# === Function to Plot Monthly Sales Trend ===
+def plot_monthly_sales(sales_data):
+    plt.figure(figsize=(12, 6))
+    plt.plot(sales_data.index, sales_data.values, marker='o')
+    plt.title('📈 Monthly Sales Trend')
+    plt.xlabel('Month')
+    plt.ylabel('Total Sales')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(IMAGE_DIR / "monthly_sales_trend.png")
+    plt.show()
+
+# === Function to Prepare Data for Prophet ===
+def prepare_prophet_data(sales_data):
+    prophet_df = sales_data.reset_index()
+    prophet_df.columns = ['ds', 'y']
+    return prophet_df
+
+# === Function to Train and Forecast using Prophet ===
+def forecast_sales(prophet_df, periods=6):
+    model = Prophet()
+    model.fit(prophet_df)
+    future = model.make_future_dataframe(periods=periods, freq='M')
+    forecast = model.predict(future)
+    return model, forecast
+
+# === Function to Plot Forecast and Components ===
+def plot_forecast(model, forecast):
+    fig1 = model.plot(forecast)
+    plt.title('📉 Sales Forecast for Next 6 Months')
+    plt.xlabel('Date')
+    plt.ylabel('Sales')
+    plt.tight_layout()
+    fig1.savefig(IMAGE_DIR / "forecast_plot.png")
+
+    fig2 = model.plot_components(forecast)
+    fig2.savefig(IMAGE_DIR / "forecast_trend_seasonality.png")
+
+# === Additional Visualizations ===
+def extra_visualizations(df):
+    # 1. Sales by Category
+    plt.figure(figsize=(8, 5))
+    category_sales = df.groupby('Category')['Sales'].sum().sort_values()
+    sns.barplot(x=category_sales.values, y=category_sales.index, palette='viridis')
+    plt.title('💼 Sales by Category')
+    plt.xlabel('Total Sales')
+    plt.tight_layout()
+    plt.savefig(IMAGE_DIR / 'sales_by_category.png')
+    plt.show()
+
+    # 2. Pie Chart: Sales by Segment
+    plt.figure(figsize=(6, 6))
+    segment_sales = df.groupby('Segment')['Sales'].sum()
+    colors = sns.color_palette('pastel')
+    plt.pie(segment_sales, labels=segment_sales.index, autopct='%1.1f%%', startangle=140, colors=colors)
+    plt.title('👥 Sales by Segment')
+    plt.tight_layout()
+    plt.savefig(IMAGE_DIR / 'sales_by_segment.png')
+    plt.show()
+
+    # 3. Pie Chart: Profit by Segment
+    plt.figure(figsize=(6, 6))
+    segment_profit = df.groupby('Segment')['Profit'].sum()
+    plt.pie(segment_profit, labels=segment_profit.index, autopct='%1.1f%%', startangle=140, colors=colors)
+    plt.title('💰 Profit by Segment')
+    plt.tight_layout()
+    plt.savefig(IMAGE_DIR / 'profit_by_segment.png')
+    plt.show()
+
+    # 4. Top 10 States by Sales
+    plt.figure(figsize=(10, 6))
+    top_states = df.groupby('State')['Sales'].sum().nlargest(10)
+    sns.barplot(x=top_states.values, y=top_states.index, palette='crest')
+    plt.title('📍 Top 10 States by Sales')
+    plt.xlabel('Total Sales')
+    plt.tight_layout()
+    plt.savefig(IMAGE_DIR / 'top_10_states.png')
+    plt.show()
+
+# === Main Workflow ===
+def main():
+    df = load_data(DATA_PATH)
+    if df is None:
+        return
+
+    monthly_sales = compute_monthly_sales(df)
+    print("\n📊 Monthly Sales Summary:\n", monthly_sales.head())
+
+    plot_monthly_sales(monthly_sales)
+
+    prophet_df = prepare_prophet_data(monthly_sales)
+    print("\n📄 Prophet-ready data:\n", prophet_df.head())
+
+    model, forecast = forecast_sales(prophet_df)
+    print("\n📅 Forecast summary:\n", forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
+
+    plot_forecast(model, forecast)
+    print("✅ Forecast plots saved.")
+
+    extra_visualizations(df)
+    print("✅ All visualizations completed and saved.")
+
+if __name__ == "__main__":
+    main()
